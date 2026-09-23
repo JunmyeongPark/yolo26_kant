@@ -1,0 +1,11 @@
+# YOLO custom dataset config - knob & MASTER detection
+# 이 파일 기준 상대경로. train() 호출 시 data.yaml 경로만 넘기면 됨.
+
+path: dataset          # 데이터셋 루트 (이 yaml 파일 기준 상대경로)
+train: images/train    # 학습 이미지 폴더
+val: images/val        # 검증 이미지 폴더
+test: images/test       # (선택) 테스트 이미지 폴더
+
+names:
+  0: knob
+  1: MASTER
