@@ -1,4 +1,4 @@
-# YOLO custom dataset config - knob & MASTER detection
+# YOLO custom dataset config - knob & traffic sign detection
 # 이 파일 기준 상대경로. train() 호출 시 data.yaml 경로만 넘기면 됨.
 
 path: dataset          # 데이터셋 루트 (이 yaml 파일 기준 상대경로)
@@ -8,4 +8,6 @@ test: images/test       # (선택) 테스트 이미지 폴더
 
 names:
   0: knob
-  1: MASTER
+  1: sign_red
+  2: sign_yellow
+  3: sign_green

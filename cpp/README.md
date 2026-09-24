@@ -1,8 +1,11 @@
-# C++ 추론 (knob / MASTER)
+# C++ 추론 (knob / 신호등 / puck)
 
 Python 학습 결과(.pt)를 export한 모델을 C++로 추론하기 위한 코드입니다.
 export된 모델 파일은 Python/C++ 어느 쪽 바인딩으로 열어도 동일하게 동작합니다 —
 export를 다시 할 필요 없이, 같은 파일을 언어만 바꿔서 씁니다.
+
+사용할 클래스는 `knob`, `sign_red`, `sign_yellow`, `sign_green`, `puck_red`, `puck_green`, `puck_blue`로 한정합니다.
+현재 데이터는 앞의 4개 클래스이며, 클래스 번호 및 확장 절차는 [루트 README](../README.md#2-2-라벨링)를 따릅니다.
 
 두 경로를 준비해뒀습니다.
 
