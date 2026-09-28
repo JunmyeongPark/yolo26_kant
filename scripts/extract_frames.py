@@ -4,7 +4,7 @@ record_video.py로 찍은 영상에서 프레임을 뽑아 라벨링용 이미�
 
 영상을 프레임 단위로 다 뽑으면 거의 똑같은 사진이 수백~수천 장 생겨서
 비효율적이라, --every-n-frames 만큼 건너뛰면서 뽑습니다
-(기본 15 = 30fps 영상 기준 초당 2장).
+(기본 5 = 30fps 영상 기준 초당 6장).
 
 사용 예:
   # 영상 한 개
@@ -12,7 +12,7 @@ record_video.py로 찍은 영상에서 프레임을 뽑아 라벨링용 이미�
 
   # 폴더 안 영상 전부 (record_video.py 기본 저장 위치)
   python3 scripts/extract_frames.py --video-dir dataset/raw_videos \
-      --outdir dataset/raw --every-n-frames 15
+      --outdir dataset/raw --every-n-frames 5
 
 추출된 이미지(dataset/raw)를 라벨링 툴(CVAT/LabelImg/Roboflow)에 불러와
 라벨링한 뒤, 같은 폴더에 이미지+라벨(.txt) 쌍이 모이면
@@ -59,8 +59,8 @@ def main() -> None:
     source.add_argument("--video", help="영상 파일 하나 (outdir에 직접 저장)")
     source.add_argument("--video-dir", help="하위 폴더를 재귀 탐색하고 상대 폴더 구조 유지")
     parser.add_argument("--outdir", default="dataset/raw")
-    parser.add_argument("--every-n-frames", type=int, default=15,
-                         help="이 프레임마다 1장씩 저장 (기본 15)")
+    parser.add_argument("--every-n-frames", type=int, default=5,
+                         help="이 프레임마다 1장씩 저장 (기본 5)")
     args = parser.parse_args()
 
     if args.every_n_frames < 1:

@@ -28,14 +28,18 @@ custom_yolo26/
 ├── data.yaml               # 현재 학습 클래스 정의 + 데이터 경로
 ├── requirements.txt
 ├── dataset/
-│   ├── images/{train,val,test}/
-│   └── labels/{train,val,test}/   # YOLO txt 포맷 라벨
+│   ├── raw_videos/{knob,sign_red,sign_yellow,sign_green}/ # 클래스별 영상
+│   ├── raw/{knob,sign_red,sign_yellow,sign_green}/        # 추출 이미지 + 같은 이름의 txt
+│   ├── images/{train,val}/<클래스폴더>/
+│   └── labels/{train,val}/<클래스폴더>/   # YOLO txt 포맷 라벨
 ├── models/                  # pretrained/학습된 가중치(.pt), NCNN 변환 모델 보관
 ├── scripts/
 │   ├── setup_env.sh         # 아키텍처 자동 감지 환경 설정 (x86_64=학습용 / aarch64=추론용)
 │   ├── record_video.py      # 데이터셋용 영상 촬영 (SPACE로 녹화 시작/정지)
-│   ├── extract_frames.py    # 촬영된 영상에서 라벨링용 프레임 추출
-│   ├── split_dataset.py     # 라벨링된 데이터 train/val/test 분할
+│   ├── extract_frames.py    # 영상 하위 폴더 구조를 유지하며 프레임 추출
+│   ├── extract_frames.sh    # 기본 경로로 프레임 추출 실행
+│   ├── split_dataset.py     # 폴더별 매 9번째 쌍은 val, 나머지는 train
+│   ├── split_dataset.sh     # 기본 경로로 데이터 분할 실행
 │   ├── train.py             # fine-tuning 실행 스크립트
 │   ├── export_ncnn.sh       # 학습된 모델을 라즈베리파이 배포용 NCNN으로 변환
 │   ├── export_onnx.sh       # 학습된 모델을 C++(ONNX Runtime) 추론용 ONNX로 변환
@@ -136,7 +140,7 @@ python3 scripts/predict_webcam.py --model yolo26n.pt --source /dev/realsense_col
 - 클래스/상황별로 클립을 나눠서 촬영 (knob만, 신호등만, puck만, 배경만, 여러 개 겹친 상황 등) —
   나중에 뭘 찍은 영상인지 헷갈리지 않게, 촬영 세션마다 파일명이나 메모로 구분해두기
 - 각도: 물체를 들고 천천히 360도 돌려가며 / 카메라를 정면·측면·위에서 내려다보는 각도로 각각 촬영
-- 거리: 로봇이 처음 인식하는 먼 거리(~1m)부터 그리퍼로 집기 직전 가까운 거리(~10~20cm)까지 다양하게
+- 거리: 로봇이 처음 인식하는 먼 거리(~1m)부터 그리퍼로 집기 직전 가까운 거리(10~20cm)까지 다양하게
 - 조명: 실내조명 on/off, 그림자 있는/없는 상태 등 대회 환경과 비슷한 조명 변화를 섞어서 촬영
 - 배경만 나오는 클립(물체 없음)도 최소 1개 이상 — false positive 방지용 negative sample
 - 일부러 여러 물체(knob, 신호등, puck)를 겹치거나 일부만 보이게 가리는 장면도 조금 섞기 — 실전 가림 상황에 강해짐
@@ -151,14 +155,29 @@ source .venv/bin/activate
 python3 scripts/record_video.py --source /dev/realsense_color
 # -> dataset/raw_videos/clip_<타임스탬프>_<번호>.mp4 로 저장됨
 
-# 2) dataset/raw_videos 안의 영상들에서 프레임 추출 (기본: 15프레임마다 1장 = 30fps 기준 초당 2장)
-python3 scripts/extract_frames.py --video-dir dataset/raw_videos --outdir dataset/raw --every-n-frames 15
-# -> dataset/raw/<영상이름>_f<프레임번호>.jpg 로 저장됨 (이 폴더가 라벨링 대상)
+# 2) 촬영된 영상을 raw_videos/knob, sign_red, sign_yellow, sign_green 등으로 정리한 뒤 추출
+bash scripts/extract_frames.sh
+# 기본: 5프레임마다 1장 (30fps 영상 기준 초당 6장)
+# raw_videos/sign_yellow/clip.mp4 -> raw/sign_yellow/clip_f000000.jpg
+
+# 추출 간격 변경 예시
+# bash scripts/extract_frames.sh --every-n-frames 10
 ```
 
-- `--every-n-frames`를 너무 작게 잡으면 거의 똑같은 사진이 쌓여서 비효율적이니 5~30 사이에서 조절
-- 영상을 여러 개 나눠 찍었다면 `--video-dir`가 폴더 안 영상을 전부 처리하니 한 번에 돌리면 됨
-- 특정 영상 하나만 다시 뽑고 싶으면 `--video-dir` 대신 `--video dataset/raw_videos/파일명.mp4` 사용
+- `--video-dir`는 하위 폴더까지 재귀 탐색하고, `raw`에도 같은 상대 폴더 구조를 만듭니다.
+- 위 셸 명령은 `.venv/bin/python`으로 다음 Python 명령을 실행합니다:
+
+```bash
+python3 scripts/extract_frames.py --video-dir dataset/raw_videos --outdir dataset/raw --every-n-frames 5
+```
+
+- 특정 영상 하나만 추출할 때는 출력할 클래스 폴더를 직접 지정합니다:
+
+```bash
+python3 scripts/extract_frames.py --video dataset/raw_videos/sign_yellow/clip.mp4 --outdir dataset/raw/sign_yellow --every-n-frames 5
+```
+
+- 기존 `raw` 루트의 이미지·라벨은 자동 이동되지 않습니다. 기존 라벨을 재사용하려면 영상 이름을 기준으로 이미지와 `.txt`를 해당 하위 폴더에 함께 옮기세요. 루트와 하위 폴더에 같은 샘플을 중복으로 남기지 마세요.
 
 ### 2-2. 라벨링
 
@@ -176,33 +195,84 @@ python3 scripts/extract_frames.py --video-dir dataset/raw_videos --outdir datase
     | 5 | puck_green |
     | 6 | puck_blue |
 
-  - 현재 라벨링 및 분할이 완료된 데이터는 `0~3`의 4개 클래스입니다 (train 3,908장 / val 488장 / test 489장).
+  - 기존 랜덤 분할 데이터는 `0~3`의 4개 클래스입니다 (train 3,908장 / val 488장 / test 489장).
     `data.yaml`도 현재는 이 4개 클래스를 정의합니다. puck 데이터 추가 시 기존 번호를 유지하고
     `4: puck_red`, `5: puck_green`, `6: puck_blue`를 `names`에 추가한 뒤 새로 학습하세요.
   - 라벨링 도구의 export 순서도 위 번호와 일치시켜야 합니다. 배경 이미지는 별도 클래스를 만들지 않고 빈 라벨로 둡니다.
-- 라벨링 결과(이미지 + 같은 이름의 .txt)가 `dataset/raw`에 모이면 `scripts/split_dataset.py`로 분할:
+- 이미지와 같은 이름의 `.txt`를 **같은 클래스 하위 폴더**에 저장합니다. 예: `raw/sign_yellow/clip_f000000.jpg`와 `raw/sign_yellow/clip_f000000.txt`.
+- 폴더 이름은 정리 기준이며 라벨의 class_id를 자동 지정하지 않습니다. 각 이미지에 보이는 대상은 클래스 번호에 맞게 모두 라벨링하세요.
+- 라벨 파일이 없는 이미지는 분할에서 제외됩니다. 배경 이미지는 빈 `.txt` 파일을 만들어 포함하세요.
+
+### 2-3. train/val 분할
+
+각 하위 폴더에서 라벨이 있는 이미지 쌍을 **파일명 순서로 정렬**하고, **9번째·18번째·27번째…는 val**, 나머지는 train에 복사합니다. 폴더마다 순번을 다시 셉니다. 9장 미만인 폴더에서는 val이 생기지 않습니다.
+랜덤 분할이 아니며 `--train`, `--val`, `--test`, `--seed` 옵션은 더 이상 사용하지 않습니다. 새 test 데이터는 만들지 않습니다.
+
+기존 `dataset/images`, `dataset/labels`에 파일이 있으면 혼합을 막기 위해 중단합니다. 재분할할 때는 먼저 두 폴더 전체를 백업 위치로 이동하세요. 아래 블록은 저장소 루트에서 실행합니다:
 
 ```bash
-python3 scripts/split_dataset.py --src dataset/raw --dst dataset --train 0.8 --val 0.1 --test 0.1
+# 기존 분할이 있는 경우에만 백업 (원본 raw는 그대로 유지)
+BACKUP_DIR="$(mktemp -d "$PWD/dataset_split_backup.XXXXXX")"
+for DIR in images labels; do
+  if [ -d "dataset/$DIR" ]; then
+    mv "dataset/$DIR" "$BACKUP_DIR/"
+  fi
+done
+
+# 기본: raw -> dataset, 매 9번째 쌍을 val로 복사
+bash scripts/split_dataset.sh
 ```
+
+동일한 Python 명령:
+
+```bash
+python3 scripts/split_dataset.py --src dataset/raw --dst dataset --val-every 9
+```
+
+출력 예: `dataset/images/val/sign_yellow/clip_f000120.jpg`와 `dataset/labels/val/sign_yellow/clip_f000120.txt`.
+백업 폴더는 보관용이며 학습 입력이나 새 커밋에 포함하지 마세요.
+
+별도 빈 위치에 미리 분할하려면 `bash scripts/split_dataset.sh --dst dataset_resplit`을 사용합니다.
+그 결과로 학습하려면 별도 YAML에서 `path`를 해당 폴더의 **절대경로**로 지정하고 `--data`로 전달하세요. 기본 `data.yaml`은 계속 `dataset`을 사용합니다.
+
+현재 `data.yaml`의 `train: images/train`, `val: images/val`은 그대로 사용합니다.
+새 분할에는 test가 없으므로 `test: images/test` 항목은 제거하거나 주석 처리하세요. 별도 test를 수집한 경우에만 해당 경로를 설정합니다.
+같은 영상의 인접 프레임이 train과 val에 들어가므로, 최종 성능은 별도로 촬영한 영상에서도 확인하세요.
 
 ## 3. 학습(Fine-tuning)
 
 ```bash
-python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640
+source .venv/bin/activate
+python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2
 ```
 
-- `model=yolo26n.pt`처럼 COCO pretrained 체크포인트로 시작 → backbone/neck은 pretrained 유지, detection head만 현재 클래스 수(`data.yaml` 기준 4개, puck 추가 후 7개)에 맞춰 재학습되면서 전체 fine-tune됨
-- Data augmentation(mosaic, HSV jitter, flip, scale 등)은 ultralytics 학습 파이프라인에 기본 내장되어 있어 별도 코드 없이 적용됨
-- 조명 변화 대응력을 더 높이고 싶으면 `--hsv-h/--hsv-s/--hsv-v` 등 augmentation 하이퍼파라미터를 조정 가능 (`yolo cfg` 문서 참고)
-- 학습 결과(가중치, 로그, 그래프)는 `runs/detect/puck_knob_v1/` 에 저장됨
-  - 주의: 같은 이름의 폴더가 이미 있으면(예: 이전에 중단된 학습) ultralytics가 자동으로 `puck_knob_v1-2`, `puck_knob_v1-3`처럼 뒤에 번호를 붙여 새 폴더를 만듭니다. 아래 예시 경로 그대로 복붙하지 말고, 학습이 끝나면 터미널에 출력되는 실제 저장 경로(또는 `ls runs/detect/`)를 먼저 확인하세요. (현재 이 프로젝트의 최신 학습 결과는 `runs/detect/puck_knob_v1-2/weights/best.pt` 입니다.)
+실행하면 프로젝트 안의 `.pt` 파일 경로 목록을 먼저 표시하고, **학습 시작 가중치**의 파일명 또는 경로를 입력받습니다.
+Enter만 누르면 `yolo26n.pt`를 사용합니다. 파일명이 중복되는 `best.pt` 등은 목록에 표시된 프로젝트 기준 상대 경로 또는 절대경로를 입력하세요.
+로컬에 없는 기본 YOLO26 모델(`yolo26n/s/m/l/x.pt`)은 Ultralytics가 다운로드합니다.
+
+입력 절차 없이 모델을 지정하려면:
+
+```bash
+python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2
+
+# 기존 학습 가중치를 시작점으로 새로 fine-tuning하는 예시
+# python3 scripts/train.py --model runs/detect/knob_sign_v2/weights/best.pt --epochs 100 --name knob_sign_v3
+```
+
+- `--model`은 시작 가중치이고, `--name`은 학습 결과 폴더 이름입니다. 기존 `.pt`를 선택해도 중단된 학습을 resume하는 방식은 아닙니다.
+- `--data` 기본값은 프로젝트의 `data.yaml`입니다. 실제 라벨 번호와 `names` 정의를 일치시키세요.
+- GPU 지정은 `--device 0`, CPU 지정은 `--device cpu`를 추가합니다.
+- 위 예시 결과는 `runs/detect/knob_sign_v2/`에 저장됩니다. 같은 이름이 있으면 새 이름이 자동 부여될 수 있으므로 터미널에 표시된 실제 저장 경로를 확인하세요.
+- 최종 추론에 사용할 가중치는 결과 폴더의 `weights/best.pt`입니다. 입력한 `.pt`의 이름이 결과 파일명으로 사용되지는 않습니다.
+- 배포 장치에는 학습 데이터를 복사할 필요가 없습니다. Python 추론에는 학습된 `.pt`를 사용하고, 아래 NCNN 배포 절차를 사용할 때는 변환된 모델 폴더를 가져갑니다.
 
 ## 4. 검증 / 추론 테스트 (노트북에서)
 
+아래 모델 경로는 실제 학습 출력 경로로 바꾸세요. 새 분할은 test를 생성하지 않으므로 val 이미지로 확인하는 예시입니다.
+
 ```bash
-yolo detect val model=runs/detect/puck_knob_v1-2/weights/best.pt data=data.yaml
-yolo detect predict model=runs/detect/puck_knob_v1-2/weights/best.pt source=dataset/images/test
+yolo detect val model=runs/detect/knob_sign_v2/weights/best.pt data=data.yaml
+yolo detect predict model=runs/detect/knob_sign_v2/weights/best.pt source=dataset/images/val
 ```
 
 ## 5. 라즈베리파이 배포
