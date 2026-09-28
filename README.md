@@ -3,7 +3,7 @@
 ## Shortcut · 명령어 모음
 
 **저장소 루트에서 실행하세요.** 최초 설치 후 새 터미널마다 `source .venv/bin/activate`로 환경을 활성화합니다.
-아래 명령은 필요한 작업만 선택해서 실행하며, `knob_sign_v2` 모델 경로는 실제 학습 결과 경로로 바꾸세요.
+아래 명령은 필요한 작업만 선택해서 실행하며, `weights/v1.pt`는 현재 보관 모델입니다. 다른 모델을 사용할 때는 파일명과 결과 폴더명도 함께 바꾸세요.
 
 | 작업 | 명령어 |
 |---|---|
@@ -15,13 +15,14 @@
 | 데이터 정리 및 train/val 분할 | `bash scripts/split_dataset.sh` |
 | 학습 (.pt 목록 표시 후 입력) | `python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2` |
 | 모델 지정 학습 | `python3 scripts/train.py --model yolo26n.pt --epochs 100 --name knob_sign_v2` |
-| 검증 | `yolo detect val model=runs/detect/knob_sign_v2/weights/best.pt data=data.yaml` |
-| 검증 영상 추론 결과 생성 | `yolo detect predict model=runs/detect/knob_sign_v2/weights/best.pt source=val_video project=runs/detect name=val_video_knob_sign_v2_best` |
+| 기존 학습 가중치 별도 보관 | `python3 scripts/collect_weights.py` |
+| 검증 | `yolo detect val model=weights/v1.pt data=data.yaml` |
+| 검증 영상 추론 결과 생성 | `yolo detect predict model=weights/v1.pt source=val_video project=runs/detect name=val_video_v1` |
 | 기존 추론 영상 + 원본 합치기 | `python3 scripts/predict_video.py` |
 | 비교 영상 다시 만들기 | `python3 scripts/predict_video.py --overwrite` |
-| 카메라 실시간 추론 | `python3 scripts/predict_webcam.py --model runs/detect/knob_sign_v2/weights/best.pt --source /dev/realsense_color` |
-| NCNN 변환 | `bash scripts/export_ncnn.sh runs/detect/knob_sign_v2/weights/best.pt` |
-| ONNX 변환 | `bash scripts/export_onnx.sh runs/detect/knob_sign_v2/weights/best.pt` |
+| 카메라 실시간 추론 | `python3 scripts/predict_webcam.py --model weights/v1.pt --source /dev/realsense_color` |
+| NCNN 변환 | `bash scripts/export_ncnn.sh weights/v1.pt` |
+| ONNX 변환 | `bash scripts/export_onnx.sh weights/v1.pt` |
 
 추출 전 `raw_videos`를 클래스별 폴더로 정리하고, 분할 전 이미지와 같은 폴더에 동명의 `.txt` 라벨을 준비하세요.
 `split_dataset.sh`는 기존 분할을 자동 백업한 뒤 재생성합니다. 비교 영상 합치기는 기존 추론 결과를 사용합니다.
@@ -62,6 +63,7 @@ custom_yolo26/
 │   ├── raw/{knob,sign_red,sign_yellow,sign_green}/        # 추출 이미지 + 같은 이름의 txt
 │   ├── images/{train,val}/<클래스폴더>/
 │   └── labels/{train,val}/<클래스폴더>/   # YOLO txt 포맷 라벨
+├── weights/                 # yolo26n.pt (기본 모델), v1.pt (최신 학습 결과)
 ├── models/                  # pretrained/학습된 가중치(.pt), NCNN 변환 모델 보관
 ├── scripts/
 │   ├── setup_env.sh         # 아키텍처 자동 감지 환경 설정 (x86_64=학습용 / aarch64=추론용)
@@ -317,7 +319,7 @@ Enter만 누르면 `yolo26n.pt`를 사용합니다. 파일명이 중복되는 `b
 python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2
 
 # 기존 학습 가중치를 시작점으로 새로 fine-tuning하는 예시
-# python3 scripts/train.py --model runs/detect/knob_sign_v2/weights/best.pt --epochs 100 --name knob_sign_v3
+# python3 scripts/train.py --model weights/v1.pt --epochs 100 --name knob_sign_v3
 ```
 
 - `--model`은 시작 가중치이고, `--name`은 학습 결과 폴더 이름입니다. 기존 `.pt`를 선택해도 중단된 학습을 resume하는 방식은 아닙니다.
@@ -327,6 +329,23 @@ python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 
 - 최종 추론에 사용할 가중치는 결과 폴더의 `weights/best.pt`입니다. 입력한 `.pt`의 이름이 결과 파일명으로 사용되지는 않습니다.
 - 배포 장치에는 학습 데이터를 복사할 필요가 없습니다. Python 추론에는 학습된 `.pt`를 사용하고, 아래 NCNN 배포 절차를 사용할 때는 변환된 모델 폴더를 가져갑니다.
 
+### 학습 가중치 별도 보관
+
+현재 `weights/v1.pt`에 대응하는 학습 결과는 `runs/detect/v1/`, 검증 영상은 `runs/detect/val_video_v1/`에 보관합니다.
+
+`weights/`에는 기본 모델 `yolo26n.pt`와 최신 학습 결과 `v1.pt`만 보관합니다.
+`train.py` 학습 완료 시 해당 실행의 `best.pt`를 `weights/v1.pt`로 복사해 갱신합니다.
+`best.pt`는 검증 평가가 가장 좋았던 체크포인트이고, `last.pt`는 마지막 체크포인트입니다.
+별도 보관본에는 best/last를 나누지 않고 추론용 best만 사용합니다. `runs/detect`의 학습 기록과 원본 체크포인트는 유지합니다.
+
+기존 학습 결과에서 체크포인트 내부 날짜 기준 최신 모델을 가져오려면:
+
+```bash
+python3 scripts/collect_weights.py
+```
+
+검증·추론·변환 명령의 모델 경로에 `weights/v1.pt`를 사용할 수 있습니다.
+
 <a id="quick-val"></a>
 
 ## 4. 검증 / 추론 테스트 (노트북에서)
@@ -334,8 +353,8 @@ python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 
 아래 모델 경로는 실제 학습 출력 경로로 바꾸세요. 새 분할은 test를 생성하지 않으므로 val 이미지로 확인하는 예시입니다.
 
 ```bash
-yolo detect val model=runs/detect/knob_sign_v2/weights/best.pt data=data.yaml
-yolo detect predict model=runs/detect/knob_sign_v2/weights/best.pt source=dataset/images/val
+yolo detect val model=weights/v1.pt data=data.yaml
+yolo detect predict model=weights/v1.pt source=dataset/images/val
 ```
 
 <a id="quick-compare"></a>
@@ -347,7 +366,7 @@ yolo detect predict model=runs/detect/knob_sign_v2/weights/best.pt source=datase
 python3 scripts/predict_video.py
 
 # 특정 결과 폴더 또는 영상만 처리
-python3 scripts/predict_video.py --prediction runs/detect/val_video_puck_knob_folder_split_best
+python3 scripts/predict_video.py --prediction runs/detect/val_video_v1
 ```
 
 재추론 없이 기존 영상 두 개를 합칩니다. `val_video`에서 확장자를 제외한 파일명이 같은 원본을 찾아,
@@ -365,7 +384,7 @@ python3 scripts/predict_video.py --prediction runs/detect/val_video_puck_knob_fo
 1. 노트북(x86_64)에서 학습된 모델을 NCNN으로 변환:
 
    ```bash
-   ./scripts/export_ncnn.sh runs/detect/puck_knob_v1-2/weights/best.pt
+   bash scripts/export_ncnn.sh weights/v1.pt
    ```
 
 2. 라즈베리파이에 저장소를 원하는 위치로 clone하고, 그 저장소 루트에서
@@ -375,7 +394,7 @@ python3 scripts/predict_video.py --prediction runs/detect/val_video_puck_knob_fo
    ```bash
    PI_HOST='사용자@라즈베리파이IP'
    PI_PROJECT_DIR='/라즈베리파이에서/pwd로/확인한/저장소경로'
-   scp -r runs/detect/puck_knob_v1-2/weights/best_ncnn_model \
+   scp -r weights/v1_ncnn_model \
        "${PI_HOST}:${PI_PROJECT_DIR}/models/"
    ```
 
@@ -384,7 +403,7 @@ python3 scripts/predict_video.py --prediction runs/detect/val_video_puck_knob_fo
    ```bash
    bash scripts/setup_env.sh  # 최초 설치 시
    source .venv/bin/activate
-   python3 scripts/predict_webcam.py --model models/best_ncnn_model --source /dev/realsense_color
+   python3 scripts/predict_webcam.py --model models/v1_ncnn_model --source /dev/realsense_color
    ```
 
 - Ultralytics 공식 벤치마크 기준(YOLO26n, RPi 5) NCNN이 ONNX/MNN보다 유의미하게 빠름(약 67ms vs 92~126ms/이미지)

@@ -14,6 +14,8 @@ import argparse
 import os
 from pathlib import Path
 
+from collect_weights import archive_weights
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -94,6 +96,7 @@ def main():
         train_kwargs["device"] = args.device
 
     model.train(**train_kwargs)
+    archive_weights(Path(model.trainer.save_dir))
 
 
 if __name__ == "__main__":
