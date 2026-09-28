@@ -4,7 +4,7 @@
 path: dataset          # 데이터셋 루트 (이 yaml 파일 기준 상대경로)
 train: images/train    # 학습 이미지 폴더
 val: images/val        # 검증 이미지 폴더
-test: images/test       # (선택) 테스트 이미지 폴더
+# test: images/test       # (선택) 테스트 이미지 폴더
 
 names:
   0: knob
