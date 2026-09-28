@@ -2,3 +2,7 @@
 .venv/
 __pycache__/
 *.py[cod]
+
+# Backups created when rebuilding dataset splits
+.split_backups/
+.resplit-*/

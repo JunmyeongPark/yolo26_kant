@@ -177,7 +177,13 @@ python3 scripts/extract_frames.py --video-dir dataset/raw_videos --outdir datase
 python3 scripts/extract_frames.py --video dataset/raw_videos/sign_yellow/clip.mp4 --outdir dataset/raw/sign_yellow --every-n-frames 5
 ```
 
-- 기존 `raw` 루트의 이미지·라벨은 자동 이동되지 않습니다. 기존 라벨을 재사용하려면 영상 이름을 기준으로 이미지와 `.txt`를 해당 하위 폴더에 함께 옮기세요. 루트와 하위 폴더에 같은 샘플을 중복으로 남기지 마세요.
+- 기존 라벨링 데이터의 폴더만 다시 정리하려면 아래 명령을 실행합니다. 영상 이름과 `_f프레임번호`를 대조해 이미지와 `.txt`를 함께 이동하며, 내용을 다시 생성하거나 라벨 번호를 바꾸지 않습니다. 매칭 실패·중복 영상 이름·파일 충돌은 이동 전에 중단합니다.
+
+```bash
+python3 scripts/organize_raw.py
+```
+
+- 새 영상의 프레임 생성은 `extract_frames.sh`, 기존 이미지·라벨의 폴더 정리는 `organize_raw.py`가 담당합니다. 기존 라벨을 재사용할 때는 프레임을 다시 추출할 필요가 없습니다.
 
 ### 2-2. 라벨링
 
@@ -208,25 +214,19 @@ python3 scripts/extract_frames.py --video dataset/raw_videos/sign_yellow/clip.mp
 각 하위 폴더에서 라벨이 있는 이미지 쌍을 **파일명 순서로 정렬**하고, **9번째·18번째·27번째…는 val**, 나머지는 train에 복사합니다. 폴더마다 순번을 다시 셉니다. 9장 미만인 폴더에서는 val이 생기지 않습니다.
 랜덤 분할이 아니며 `--train`, `--val`, `--test`, `--seed` 옵션은 더 이상 사용하지 않습니다. 새 test 데이터는 만들지 않습니다.
 
-기존 `dataset/images`, `dataset/labels`에 파일이 있으면 혼합을 막기 위해 중단합니다. 재분할할 때는 먼저 두 폴더 전체를 백업 위치로 이동하세요. 아래 블록은 저장소 루트에서 실행합니다:
+재분할 명령은 **`raw_videos`의 영상 이름 기준으로 기존 `raw` 이미지·라벨 정리 → 폴더별 train/val 생성 → 기존 출력 백업 후 교체**를 한 번에 수행합니다. 새 프레임 추출이나 라벨 생성은 하지 않습니다. 실행 중인 학습을 마친 뒤 사용하세요.
 
 ```bash
-# 기존 분할이 있는 경우에만 백업 (원본 raw는 그대로 유지)
-BACKUP_DIR="$(mktemp -d "$PWD/dataset_split_backup.XXXXXX")"
-for DIR in images labels; do
-  if [ -d "dataset/$DIR" ]; then
-    mv "dataset/$DIR" "$BACKUP_DIR/"
-  fi
-done
-
-# 기본: raw -> dataset, 매 9번째 쌍을 val로 복사
 bash scripts/split_dataset.sh
+# 검증 간격 변경: bash scripts/split_dataset.sh --val-every 9
 ```
 
-동일한 Python 명령:
+기존 images/labels와 캐시는 `dataset/.split_backups/split-*/`에 보관하며 Git에서 제외됩니다. 새 분할 생성에 성공한 뒤 기존 출력을 교체합니다.
+
+raw 정리 없이 이미 정리된 원본을 빈 출력 위치로 분할하는 기존 Python 명령도 사용할 수 있습니다:
 
 ```bash
-python3 scripts/split_dataset.py --src dataset/raw --dst dataset --val-every 9
+python3 scripts/split_dataset.py --src dataset/raw --dst dataset_resplit --val-every 9
 ```
 
 출력 예: `dataset/images/val/sign_yellow/clip_f000120.jpg`와 `dataset/labels/val/sign_yellow/clip_f000120.txt`.
