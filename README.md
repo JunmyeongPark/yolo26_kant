@@ -1,5 +1,35 @@
 # custom_yolo26
 
+## Shortcut · 명령어 모음
+
+**저장소 루트에서 실행하세요.** 최초 설치 후 새 터미널마다 `source .venv/bin/activate`로 환경을 활성화합니다.
+아래 명령은 필요한 작업만 선택해서 실행하며, `knob_sign_v2` 모델 경로는 실제 학습 결과 경로로 바꾸세요.
+
+| 작업 | 명령어 |
+|---|---|
+| 최초 환경 설치 | `bash scripts/setup_env.sh` |
+| 가상환경 활성화 | `source .venv/bin/activate` |
+| 영상 촬영 | `python3 scripts/record_video.py --source /dev/realsense_color` |
+| 프레임 추출 (기본 5프레임마다) | `bash scripts/extract_frames.sh` |
+| 라벨링 완료 후 빈 라벨 생성 | `python3 scripts/create_empty_labels.py` |
+| 데이터 정리 및 train/val 분할 | `bash scripts/split_dataset.sh` |
+| 학습 (.pt 목록 표시 후 입력) | `python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2` |
+| 모델 지정 학습 | `python3 scripts/train.py --model yolo26n.pt --epochs 100 --name knob_sign_v2` |
+| 검증 | `yolo detect val model=runs/detect/knob_sign_v2/weights/best.pt data=data.yaml` |
+| 검증 영상 추론 결과 생성 | `yolo detect predict model=runs/detect/knob_sign_v2/weights/best.pt source=val_video project=runs/detect name=val_video_knob_sign_v2_best` |
+| 기존 추론 영상 + 원본 합치기 | `python3 scripts/predict_video.py` |
+| 비교 영상 다시 만들기 | `python3 scripts/predict_video.py --overwrite` |
+| 카메라 실시간 추론 | `python3 scripts/predict_webcam.py --model runs/detect/knob_sign_v2/weights/best.pt --source /dev/realsense_color` |
+| NCNN 변환 | `bash scripts/export_ncnn.sh runs/detect/knob_sign_v2/weights/best.pt` |
+| ONNX 변환 | `bash scripts/export_onnx.sh runs/detect/knob_sign_v2/weights/best.pt` |
+
+추출 전 `raw_videos`를 클래스별 폴더로 정리하고, 분할 전 이미지와 같은 폴더에 동명의 `.txt` 라벨을 준비하세요.
+`split_dataset.sh`는 기존 분할을 자동 백업한 뒤 재생성합니다. 비교 영상 합치기는 기존 추론 결과를 사용합니다.
+
+**상세 설명 바로가기:** [환경 설치](#quick-setup) · [촬영/추출](#quick-extract) · [라벨링](#quick-label) · [분할](#quick-split) · [학습](#quick-train) · [검증](#quick-val) · [영상 합치기](#quick-compare) · [배포](#quick-deploy)
+
+---
+
 Waffle Pi 형태 이동로봇 - knob, sign_red, sign_yellow, sign_green, puck_red, puck_green, puck_blue 인식용 YOLO custom dataset 학습 프로젝트.
 
 RGB 기반, **pretrained YOLO + custom dataset fine-tuning(transfer learning)** 방식으로 진행합니다.
@@ -72,6 +102,8 @@ ls -l /dev/realsense_*   # realsense_color, realsense_depth, realsense_infra1 �
 이후 모든 스크립트/코드에서 카메라 소스는 `/dev/realsense_color`(RGB)로 고정해서 씁니다.
 숫자 인덱스(`0`, `1` 등)는 노트북 내장 웹캠일 수 있으니 사용하지 마세요.
 
+<a id="quick-setup"></a>
+
 ## 1. 환경 설치
 
 `setup_env.sh`가 `uname -m`으로 아키텍처를 감지해서 알아서 역할을 나눕니다.
@@ -129,6 +161,8 @@ python3 scripts/predict_webcam.py --model yolo26n.pt --source /dev/realsense_col
 
 ## 2. 데이터 수집 & 라벨링
 
+<a id="quick-extract"></a>
+
 ### 2-1. 영상 촬영 + 프레임 추출
 
 한 장씩 사진 찍는 것보다, knob, 신호등, puck을 들고 다양한 각도·거리로 천천히 움직이며
@@ -185,6 +219,8 @@ python3 scripts/organize_raw.py
 
 - 새 영상의 프레임 생성은 `extract_frames.sh`, 기존 이미지·라벨의 폴더 정리는 `organize_raw.py`가 담당합니다. 기존 라벨을 재사용할 때는 프레임을 다시 추출할 필요가 없습니다.
 
+<a id="quick-label"></a>
+
 ### 2-2. 라벨링
 
 - 라벨링 툴: [CVAT](https://www.cvat.ai/), [LabelImg](https://github.com/heartexlab/labelImg), [Roboflow](https://roboflow.com/) 등에서 `dataset/raw`의 이미지를 불러와 YOLO 포맷으로 export
@@ -208,6 +244,29 @@ python3 scripts/organize_raw.py
 - 이미지와 같은 이름의 `.txt`를 **같은 클래스 하위 폴더**에 저장합니다. 예: `raw/sign_yellow/clip_f000000.jpg`와 `raw/sign_yellow/clip_f000000.txt`.
 - 폴더 이름은 정리 기준이며 라벨의 class_id를 자동 지정하지 않습니다. 각 이미지에 보이는 대상은 클래스 번호에 맞게 모두 라벨링하세요.
 - 라벨 파일이 없는 이미지는 분할에서 제외됩니다. 배경 이미지는 빈 `.txt` 파일을 만들어 포함하세요.
+
+#### makesense.ai export 후 빈 라벨 생성
+
+makesense.ai에서 라벨을 export하고 이미지 옆에 배치한 뒤, 탐지 대상이 없는 이미지의 빈 `.txt`를 다음 명령으로 보완합니다.
+**선택한 폴더의 모든 이미지에 대한 라벨링과 export 배치를 완료한 뒤 실행하세요.** 이 스크립트는 라벨링 미완료 이미지와 배경 이미지를 구분하지 않으며, `.txt`가 없으면 모두 배경 라벨을 만듭니다.
+
+```bash
+# 생성 대상 확인 (파일 변경 없음)
+python3 scripts/create_empty_labels.py --dry-run
+
+# dataset/raw 하위 폴더 전체에서 누락된 .txt 생성
+python3 scripts/create_empty_labels.py
+
+# 이후 이미지와 라벨을 함께 train/val로 분할
+bash scripts/split_dataset.sh
+```
+
+일부 폴더만 라벨링을 마쳤다면 `python3 scripts/create_empty_labels.py --src dataset/raw/sign_yellow`처럼 범위를 지정하세요.
+`.jpg`, `.jpeg`, `.png`를 재귀 탐색하며 기존 `.txt`는 내용이 있거나 비어 있거나 그대로 유지합니다.
+예: `raw/sign_yellow/clip_f000000.jpg`에 라벨이 없으면 같은 위치에 0바이트 `clip_f000000.txt`를 생성합니다.
+이렇게 만든 이미지·빈 라벨 쌍도 분할과 학습에 포함됩니다. 탐지할 물체가 있는 이미지는 먼저 해당 박스를 라벨링해야 합니다.
+
+<a id="quick-split"></a>
 
 ### 2-3. train/val 분할
 
@@ -239,6 +298,8 @@ python3 scripts/split_dataset.py --src dataset/raw --dst dataset_resplit --val-e
 새 분할에는 test가 없으므로 `test: images/test` 항목은 제거하거나 주석 처리하세요. 별도 test를 수집한 경우에만 해당 경로를 설정합니다.
 같은 영상의 인접 프레임이 train과 val에 들어가므로, 최종 성능은 별도로 촬영한 영상에서도 확인하세요.
 
+<a id="quick-train"></a>
+
 ## 3. 학습(Fine-tuning)
 
 ```bash
@@ -266,6 +327,8 @@ python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 
 - 최종 추론에 사용할 가중치는 결과 폴더의 `weights/best.pt`입니다. 입력한 `.pt`의 이름이 결과 파일명으로 사용되지는 않습니다.
 - 배포 장치에는 학습 데이터를 복사할 필요가 없습니다. Python 추론에는 학습된 `.pt`를 사용하고, 아래 NCNN 배포 절차를 사용할 때는 변환된 모델 폴더를 가져갑니다.
 
+<a id="quick-val"></a>
+
 ## 4. 검증 / 추론 테스트 (노트북에서)
 
 아래 모델 경로는 실제 학습 출력 경로로 바꾸세요. 새 분할은 test를 생성하지 않으므로 val 이미지로 확인하는 예시입니다.
@@ -274,6 +337,28 @@ python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 
 yolo detect val model=runs/detect/knob_sign_v2/weights/best.pt data=data.yaml
 yolo detect predict model=runs/detect/knob_sign_v2/weights/best.pt source=dataset/images/val
 ```
+
+<a id="quick-compare"></a>
+
+### 검증 영상: 원본과 추론 결과 동시 재생
+
+```bash
+# runs/detect 아래 val_video* 폴더의 기존 추론 영상에 원본 붙이기
+python3 scripts/predict_video.py
+
+# 특정 결과 폴더 또는 영상만 처리
+python3 scripts/predict_video.py --prediction runs/detect/val_video_puck_knob_folder_split_best
+```
+
+재추론 없이 기존 영상 두 개를 합칩니다. `val_video`에서 확장자를 제외한 파일명이 같은 원본을 찾아,
+왼쪽에 원본·오른쪽에 추론 결과를 배치한 `<영상이름>_comparison.mp4`를 추론 결과와 같은 폴더에 저장합니다.
+따라서 기존 `val_video_<pt이름>` 결과 폴더 이름이 유지됩니다. `.pt` 파일이나 GPU는 필요하지 않습니다.
+원본과 추론 영상은 첫 프레임부터 대응하는 전체 영상이어야 하며 FPS·프레임 수·해상도가 다르면 중단합니다.
+원본 FPS를 유지하고 음성은 포함하지 않습니다.
+기존 `_comparison.mp4`는 입력에서 제외하고, 출력이 이미 있으면 건너뜁니다. 재생성하려면 `--overwrite`를 추가하세요.
+원본 위치를 바꾸려면 `--original-dir 경로`를 지정합니다. 동명 원본이 여러 개면 해당 원본의 하위 폴더를 지정하세요.
+
+<a id="quick-deploy"></a>
 
 ## 5. 라즈베리파이 배포
 
