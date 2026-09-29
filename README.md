@@ -13,11 +13,11 @@
 | 프레임 추출 (기본 5프레임마다) | `bash scripts/extract_frames.sh` |
 | 라벨링 완료 후 빈 라벨 생성 | `python3 scripts/create_empty_labels.py` |
 | 데이터 정리 및 train/val 분할 | `bash scripts/split_dataset.sh` |
-| 학습 (.pt 목록 표시 후 입력) | `python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2` |
-| 모델 지정 학습 | `python3 scripts/train.py --model yolo26n.pt --epochs 100 --name knob_sign_v2` |
-| 기존 학습 가중치 별도 보관 | `python3 scripts/collect_weights.py` |
+| 학습 (.pt 목록 표시 후 입력) | `python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2 --output v2.pt` |
+| 모델 지정 학습 | `python3 scripts/train.py --model yolo26n.pt --epochs 100 --name knob_sign_v2 --output v2.pt` |
+| 기존 학습 가중치 별도 보관 | `python3 scripts/collect_weights.py --output v2.pt` |
 | 검증 | `yolo detect val model=weights/v1.pt data=data.yaml` |
-| 검증 영상 추론 결과 생성 | `yolo detect predict model=weights/v1.pt source=val_video project=runs/detect name=val_video_v1` |
+| 검증 영상 추론 결과 생성 | `yolo detect predict model=weights/v1.pt source=val_video project="$(pwd)/runs/detect" name=val_video_v1` |
 | 기존 추론 영상 + 원본 합치기 | `python3 scripts/predict_video.py` |
 | 비교 영상 다시 만들기 | `python3 scripts/predict_video.py --overwrite` |
 | 카메라 실시간 추론 | `python3 scripts/predict_webcam.py --model weights/v1.pt --source /dev/realsense_color` |
@@ -306,7 +306,7 @@ python3 scripts/split_dataset.py --src dataset/raw --dst dataset_resplit --val-e
 
 ```bash
 source .venv/bin/activate
-python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2
+python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2 --output v2.pt
 ```
 
 실행하면 프로젝트 안의 `.pt` 파일 경로 목록을 먼저 표시하고, **학습 시작 가중치**의 파일명 또는 경로를 입력받습니다.
@@ -316,10 +316,10 @@ Enter만 누르면 `yolo26n.pt`를 사용합니다. 파일명이 중복되는 `b
 입력 절차 없이 모델을 지정하려면:
 
 ```bash
-python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2
+python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2 --output v2.pt
 
 # 기존 학습 가중치를 시작점으로 새로 fine-tuning하는 예시
-# python3 scripts/train.py --model weights/v1.pt --epochs 100 --name knob_sign_v3
+# python3 scripts/train.py --model weights/v1.pt --epochs 100 --name knob_sign_v3 --output v3.pt
 ```
 
 - `--model`은 시작 가중치이고, `--name`은 학습 결과 폴더 이름입니다. 기존 `.pt`를 선택해도 중단된 학습을 resume하는 방식은 아닙니다.
@@ -333,15 +333,17 @@ python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 
 
 현재 `weights/v1.pt`에 대응하는 학습 결과는 `runs/detect/v1/`, 검증 영상은 `runs/detect/val_video_v1/`에 보관합니다.
 
-`weights/`에는 기본 모델 `yolo26n.pt`와 최신 학습 결과 `v1.pt`만 보관합니다.
-`train.py` 학습 완료 시 해당 실행의 `best.pt`를 `weights/v1.pt`로 복사해 갱신합니다.
+`train.py` 학습 완료 시 해당 실행의 `best.pt`를 `weights/<지정한 파일명>`으로 복사합니다.
+`--output v2.pt`로 지정하면 `weights/v2.pt`에 저장합니다. 옵션을 생략하면 학습 시작 전에 저장할 `.pt` 파일명을 입력받습니다.
+파일명만 입력하세요(경로 제외). 같은 이름의 보관 파일이 있으면 갱신하므로 새 버전은 새 이름으로 지정하세요.
+`--name`은 학습 결과 폴더 이름이며, `--output`은 별도 보관할 파일명입니다.
 `best.pt`는 검증 평가가 가장 좋았던 체크포인트이고, `last.pt`는 마지막 체크포인트입니다.
 별도 보관본에는 best/last를 나누지 않고 추론용 best만 사용합니다. `runs/detect`의 학습 기록과 원본 체크포인트는 유지합니다.
 
 기존 학습 결과에서 체크포인트 내부 날짜 기준 최신 모델을 가져오려면:
 
 ```bash
-python3 scripts/collect_weights.py
+python3 scripts/collect_weights.py --output v2.pt
 ```
 
 검증·추론·변환 명령의 모델 경로에 `weights/v1.pt`를 사용할 수 있습니다.
@@ -356,6 +358,32 @@ python3 scripts/collect_weights.py
 yolo detect val model=weights/v1.pt data=data.yaml
 yolo detect predict model=weights/v1.pt source=dataset/images/val
 ```
+
+### 촬영 각도에 따른 탐지 성능 차이 (v2 확인, 2026-09-30)
+
+**같은 물체라도 방향·촬영 각도가 학습 데이터와 다르면 미탐하거나 다른 클래스로 인식할 수 있습니다.**
+`sign_off` 학습 샘플에서는 신호등을 가로로 든 모습이 주로 확인됐고, 검증 영상에서는 세로로 매단 모습이 확인됐습니다.
+클래스가 모델에 등록되어 있다는 사실만으로 다양한 방향에서 탐지된다고 보장할 수 없습니다.
+
+`weights/v2.pt`로 `val_video/clip_20260923_203742_001.mp4`의 1,153프레임을 검사했을 때,
+신뢰도 0.25 이상인 `sign_off` 예측은 0프레임이었습니다. 0.01까지 낮춰도 2프레임뿐이며 최고 점수는 약 0.079였습니다.
+같은 프레임을 시계 방향으로 90도 회전한 비교 결과는 다음과 같습니다(프레임 번호는 0부터 시작).
+아래 숫자는 예측 신뢰도이며, 전체 데이터셋의 정확도를 의미하지 않습니다.
+
+| 프레임 | 원본 예측 | 90도 회전 후 예측 |
+|---|---|---|
+| 696 | sign_green 0.406 | sign_off 0.859 |
+| 720 | sign_green 0.590 | sign_off 0.892 |
+| 1020 | sign_green 0.828 | sign_off 0.857 |
+
+방향 차이가 주요 원인이라는 근거지만, 배경·조명·흔들림 등의 영향까지 배제한 실험은 아닙니다.
+현재 val의 sign_off 40개에서는 재현율 1.0, mAP50 약 0.993이 나왔지만,
+기존 분할은 같은 영상의 인접 프레임을 train/val에 나누므로 별도 영상 성능을 대표하지 않을 수 있습니다.
+
+개선 계획은 원본을 유지하면서 **train 이미지와 바운딩 박스 라벨을 함께 90도·270도 회전**해 증강하고,
+세로 방향 실촬영 데이터도 보강하는 것입니다. 원본과 회전본이 train/val에 나뉘지 않도록 먼저 분할한 뒤 train만 증강하세요.
+v2 학습 설정은 `degrees: 0`입니다. 회전 증강 및 재학습은 아직 적용하지 않았으며,
+적용 후에는 학습에 쓰지 않은 세로 방향 영상에서 다시 평가해야 합니다.
 
 <a id="quick-compare"></a>
 

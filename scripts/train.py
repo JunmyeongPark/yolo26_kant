@@ -14,7 +14,7 @@ import argparse
 import os
 from pathlib import Path
 
-from collect_weights import archive_weights
+from collect_weights import archive_weights, choose_output_filename
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -73,13 +73,16 @@ def main():
                          help="예: 0 (GPU 0번), cpu. 미지정 시 자동 선택")
     parser.add_argument("--name", default="puck_knob_v1",
                          help="runs/detect/<name> 으로 결과 저장")
+    parser.add_argument("--output", help="weights/에 저장할 .pt 파일명. 생략하면 학습 전에 입력받음")
     args = parser.parse_args()
 
     try:
         checkpoint = args.model or choose_checkpoint(PROJECT_ROOT)
+        filename = choose_output_filename(args.output)
     except ValueError as error:
         parser.error(str(error))
     print(f"학습 시작 가중치: {checkpoint}")
+    print(f"학습 결과 보관: {PROJECT_ROOT / 'weights' / filename}")
     from ultralytics import YOLO
 
     model = YOLO(checkpoint)  # COCO pretrained 가중치 로드 (transfer learning 시작점)
@@ -96,7 +99,7 @@ def main():
         train_kwargs["device"] = args.device
 
     model.train(**train_kwargs)
-    archive_weights(Path(model.trainer.save_dir))
+    archive_weights(Path(model.trainer.save_dir), filename=filename)
 
 
 if __name__ == "__main__":
