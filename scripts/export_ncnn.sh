@@ -43,4 +43,5 @@ echo ""
 echo "완료. 변환된 모델: ${OUT_DIR}"
 echo ""
 echo "라즈베리파이로 복사 예시:"
-echo "  scp -r ${OUT_DIR} pi@<라즈베리파이IP>:~/craft/custom_yolo26/models/"
+echo '  # README의 배포 절차에 따라 PI_HOST와 PI_PROJECT_DIR를 먼저 설정하세요.'
+printf '  scp -r %q "${PI_HOST}:${PI_PROJECT_DIR}/models/"\n' "$OUT_DIR"

@@ -14,8 +14,8 @@ set -euo pipefail
 # 라즈베리파이로 옮겨서 추론에 사용하는 흐름입니다.
 #
 # 사용법:
-#   chmod +x setup_env.sh
-#   ./setup_env.sh
+#   bash scripts/setup_env.sh
+#   source .venv/bin/activate  # 설치 완료 후 현재 터미널에서 별도로 실행
 # ==========================================================
 
 ARCH=$(uname -m)
@@ -30,22 +30,17 @@ case "$ARCH" in
     echo ""
     echo "[x86_64] 학습용 환경을 설정합니다."
     python3 -m venv .venv
-    # shellcheck disable=SC1091
-    source .venv/bin/activate
-    pip install -U pip
-    pip install -r requirements.txt
+    .venv/bin/python -m pip install -U pip
+    .venv/bin/python -m pip install -r requirements.txt
 
     if command -v nvidia-smi &> /dev/null; then
       echo "NVIDIA GPU 감지됨. CUDA 사용 가능 여부 확인 중..."
-      python3 -c "import torch; print('CUDA available:', torch.cuda.is_available())" || \
+      .venv/bin/python -c "import torch; print('CUDA available:', torch.cuda.is_available())" || \
         echo "(torch import 실패 - 설치가 아직 안 됐거나 문제가 있을 수 있음)"
     else
       echo "GPU 미감지. CPU로 학습됩니다(속도가 느릴 수 있음)."
     fi
 
-    echo ""
-    echo "완료. 다음부터는 아래로 가상환경 활성화 후 작업하세요:"
-    echo "  source .venv/bin/activate"
     ;;
 
   aarch64)
@@ -57,10 +52,8 @@ case "$ARCH" in
     sudo apt install -y python3-pip python3-venv
 
     python3 -m venv .venv
-    # shellcheck disable=SC1091
-    source .venv/bin/activate
-    pip install -U pip
-    pip install ultralytics ncnn
+    .venv/bin/python -m pip install -U pip
+    .venv/bin/python -m pip install ultralytics ncnn
 
     echo ""
     echo "완료. 학습은 이 장치에서 하지 않습니다."
@@ -79,3 +72,8 @@ case "$ARCH" in
     exit 1
     ;;
 esac
+
+echo ""
+echo "설치 완료. 현재 터미널의 가상환경은 자동으로 활성화되지 않습니다."
+echo "현재 터미널에서 아래 명령을 실행하세요 (새 터미널에서도 필요):"
+printf '  source %q\n' "$PROJECT_ROOT/.venv/bin/activate"
