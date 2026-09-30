@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""기존 추론 영상에 val_video의 동명 원본을 붙여 비교 MP4를 저장합니다."""
+"""기존 추론 영상에 val_video의 동명 원본을 붙여 비교 영상을 저장합니다."""
 import argparse
 import math
 from pathlib import Path
@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-VIDEO_EXTS = {'.mp4', '.avi', '.mov', '.mkv'}
+VIDEO_EXTS = {'.mp4', '.avi', '.mov', '.mkv', '.webm'}
 
 
 def videos_in(path):
@@ -22,7 +22,8 @@ def combine_videos(original, prediction, target):
     left = cv2.VideoCapture(str(original))
     right = cv2.VideoCapture(str(prediction))
     writer = None
-    temporary = target.with_name(target.stem + '.partial.mp4')
+    temporary = target.with_name(target.stem + '.partial' + target.suffix)
+    codec = {'.mp4': 'mp4v', '.avi': 'MJPG', '.webm': 'VP80'}[target.suffix.lower()]
     count = 0
     try:
         if not left.isOpened() or not right.isOpened():
@@ -46,7 +47,7 @@ def combine_videos(original, prediction, target):
                 cv2.putText(header, label, (x, 27), cv2.FONT_HERSHEY_SIMPLEX, .7, (255, 255, 255), 2)
             comparison = np.concatenate((header, np.concatenate((frame, result), axis=1)), axis=0)
             if writer is None:
-                writer = cv2.VideoWriter(str(temporary), cv2.VideoWriter_fourcc(*'mp4v'), fps, (width * 2, height + 40))
+                writer = cv2.VideoWriter(str(temporary), cv2.VideoWriter_fourcc(*codec), fps, (width * 2, height + 40))
                 if not writer.isOpened():
                     raise ValueError(f'출력 영상을 만들 수 없습니다: {target}')
             writer.write(comparison)
@@ -70,6 +71,7 @@ def main():
     parser.add_argument('--prediction', type=Path, help='추론 영상 또는 폴더. 생략하면 runs/detect의 val_video* 폴더 모두 처리')
     parser.add_argument('--original-dir', type=Path, default=PROJECT_ROOT / 'val_video')
     parser.add_argument('--overwrite', action='store_true', help='기존 비교 MP4 재생성')
+    parser.add_argument('--format', choices=['mp4', 'avi', 'webm'], default='mp4', help='비교 영상 형식')
     args = parser.parse_args()
     originals = videos_in(args.original_dir.expanduser().resolve())
     if args.prediction:
@@ -86,7 +88,7 @@ def main():
             parser.error(f'{prediction.name}: 동명 원본이 {len(matches)}개입니다. --original-dir를 확인하세요.')
         if matches[0].resolve() == prediction.resolve():
             parser.error('원본과 추론 입력이 같은 파일입니다.')
-        target = prediction.with_name(prediction.stem + '_comparison.mp4')
+        target = prediction.with_name(prediction.stem + '_comparison.' + args.format)
         if target.exists() and not args.overwrite:
             print(f'기존 비교 영상 건너뜀: {target}')
             continue

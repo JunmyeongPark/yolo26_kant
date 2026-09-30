@@ -57,7 +57,11 @@ def main():
     parser.add_argument("--dst", required=True, help="dataset 루트 폴더")
     parser.add_argument("--val-every", type=int, default=9, help="매 N번째 쌍을 val에 배정 (기본 9)")
     parser.add_argument("--move", action="store_true", help="복사 대신 이동(원본 삭제)")
+    parser.add_argument("--skip-existing", action="store_true",
+                        help="기존 train/val/test에 이미지나 라벨이 있으면 해당 쌍을 건너뜀")
     args = parser.parse_args()
+    if args.skip_existing and args.move:
+        parser.error("--skip-existing은 --move와 함께 사용할 수 없습니다.")
     src_dir = Path(args.src).expanduser().resolve()
     dst_root = Path(args.dst).expanduser().resolve()
     if args.val_every < 2:
@@ -68,7 +72,7 @@ def main():
         parser.error("--dst는 --src 내부에 둘 수 없습니다.")
     for kind in ("images", "labels"):
         root = dst_root / kind
-        if root.exists() and (not root.is_dir() or any(p.is_file() for p in root.rglob("*"))):
+        if root.exists() and (not root.is_dir() or (not args.skip_existing and any(p.is_file() for p in root.rglob("*")))):
             parser.error(f"기존 출력이 있습니다: {root}. images/labels를 먼저 백업·이동하거나 빈 --dst를 지정하세요.")
     pairs = find_pairs(src_dir)
     if not pairs:
@@ -79,6 +83,16 @@ def main():
         parser.error("같은 폴더에 이름이 같고 확장자만 다른 이미지가 있습니다.")
     splits = split_pairs(pairs, args.val_every)
     for name, subset in splits.items():
+        if args.skip_existing:
+            pending = []
+            for img_path, label_path in subset:
+                targets = [dst_root / kind / split / source.relative_to(src_dir)
+                           for split in ("train", "val", "test")
+                           for source, kind in ((img_path, "images"), (label_path, "labels"))]
+                if not any(target.exists() or target.is_symlink() for target in targets):
+                    pending.append((img_path, label_path))
+            print(f"{name}: 기존 파일 쌍 {len(subset) - len(pending)}개 건너뜀")
+            subset = pending
         copy_split(name, subset, dst_root, src_dir, move=args.move)
         print(f"{name}: {len(subset)}장")
     print(f"완료. 총 {len(pairs)}쌍 -> {dst_root}")

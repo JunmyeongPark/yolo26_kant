@@ -1,0 +1,112 @@
+[
+  {
+    "frame": 1025,
+    "rotation": 0,
+    "detections": [
+      {
+        "class": "sign_yellow",
+        "confidence": 0.8892
+      }
+    ]
+  },
+  {
+    "frame": 1025,
+    "rotation": 90,
+    "detections": [
+      {
+        "class": "sign_off",
+        "confidence": 0.6181
+      },
+      {
+        "class": "sign_red",
+        "confidence": 0.1097
+      }
+    ]
+  },
+  {
+    "frame": 1025,
+    "rotation": 270,
+    "detections": [
+      {
+        "class": "sign_off",
+        "confidence": 0.746
+      },
+      {
+        "class": "sign_red",
+        "confidence": 0.62
+      },
+      {
+        "class": "sign_green",
+        "confidence": 0.0185
+      }
+    ]
+  },
+  {
+    "frame": 1027,
+    "rotation": 0,
+    "detections": [
+      {
+        "class": "sign_yellow",
+        "confidence": 0.8891
+      }
+    ]
+  },
+  {
+    "frame": 1027,
+    "rotation": 90,
+    "detections": [
+      {
+        "class": "sign_off",
+        "confidence": 0.9059
+      }
+    ]
+  },
+  {
+    "frame": 1027,
+    "rotation": 270,
+    "detections": [
+      {
+        "class": "sign_off",
+        "confidence": 0.8837
+      },
+      {
+        "class": "sign_red",
+        "confidence": 0.6296
+      }
+    ]
+  },
+  {
+    "frame": 1034,
+    "rotation": 0,
+    "detections": [
+      {
+        "class": "sign_yellow",
+        "confidence": 0.9214
+      }
+    ]
+  },
+  {
+    "frame": 1034,
+    "rotation": 90,
+    "detections": [
+      {
+        "class": "sign_off",
+        "confidence": 0.9278
+      }
+    ]
+  },
+  {
+    "frame": 1034,
+    "rotation": 270,
+    "detections": [
+      {
+        "class": "sign_red",
+        "confidence": 0.3704
+      },
+      {
+        "class": "sign_off",
+        "confidence": 0.3174
+      }
+    ]
+  }
+]

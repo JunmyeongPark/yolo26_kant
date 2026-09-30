@@ -12,6 +12,7 @@ Enter를 누르면 yolo26n.pt를 사용합니다. data.yaml은 프로젝트 루�
 
 import argparse
 import os
+from datetime import datetime
 from pathlib import Path
 
 from collect_weights import archive_weights, choose_output_filename
@@ -61,6 +62,17 @@ def choose_checkpoint(root):
         print(f"파일을 찾을 수 없습니다: {candidate}")
 
 
+def confirm_overwrite(paths):
+    existing = [path for path in paths if path.exists() or path.is_symlink()]
+    if not existing:
+        return True
+    print("기존 결과가 있습니다:\n" + "\n".join(f"  {path}" for path in existing))
+    try:
+        return input("덮어쓰시겠습니까? [y/N]: ").strip().lower() in {"y", "yes"}
+    except EOFError:
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="knob/MASTER YOLO fine-tuning")
     parser.add_argument("--model",
@@ -71,8 +83,7 @@ def main():
     parser.add_argument("--batch", type=int, default=16)
     parser.add_argument("--device", default=None,
                          help="예: 0 (GPU 0번), cpu. 미지정 시 자동 선택")
-    parser.add_argument("--name", default="puck_knob_v1",
-                         help="runs/detect/<name> 으로 결과 저장")
+    parser.add_argument("--name", help="호환용 옵션. --output의 확장자를 뺀 이름과 같아야 합니다.")
     parser.add_argument("--output", help="weights/에 저장할 .pt 파일명. 생략하면 학습 전에 입력받음")
     args = parser.parse_args()
 
@@ -81,18 +92,36 @@ def main():
         filename = choose_output_filename(args.output)
     except ValueError as error:
         parser.error(str(error))
+    run_name = Path(filename).stem
+    if args.name is not None and args.name != run_name:
+        parser.error(f"--name은 출력 파일명에 맞춰 {run_name}이어야 합니다. 생략하면 자동 설정됩니다.")
+    run_dir = PROJECT_ROOT / "runs" / "detect" / run_name
+    target = PROJECT_ROOT / "weights" / filename
+    if not confirm_overwrite([run_dir, target]):
+        print("학습을 취소했습니다. 기존 결과는 유지됩니다.")
+        return
+    print(f"학습 결과 폴더: {run_dir}")
     print(f"학습 시작 가중치: {checkpoint}")
     print(f"학습 결과 보관: {PROJECT_ROOT / 'weights' / filename}")
     from ultralytics import YOLO
 
     model = YOLO(checkpoint)  # COCO pretrained 가중치 로드 (transfer learning 시작점)
 
+    # 시작 체크포인트를 먼저 로드한 후 기존 실행을 보관합니다.
+    if run_dir.exists() or run_dir.is_symlink():
+        backup_root = run_dir.parent / ".overwrite_backups"
+        backup_root.mkdir(exist_ok=True)
+        backup = backup_root / f"{run_name}-{datetime.now():%Y%m%d-%H%M%S-%f}"
+        run_dir.rename(backup)
+        print(f"기존 학습 폴더 백업: {backup}")
+
     train_kwargs = dict(
         data=args.data,
         epochs=args.epochs,
         imgsz=args.imgsz,
         batch=args.batch,
-        name=args.name,
+        name=run_name,
+        exist_ok=True,
         project=str(PROJECT_ROOT / "runs" / "detect"),
     )
     if args.device is not None:

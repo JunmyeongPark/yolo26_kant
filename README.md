@@ -13,8 +13,8 @@
 | 프레임 추출 (기본 5프레임마다) | `bash scripts/extract_frames.sh` |
 | 라벨링 완료 후 빈 라벨 생성 | `python3 scripts/create_empty_labels.py` |
 | 데이터 정리 및 train/val 분할 | `bash scripts/split_dataset.sh` |
-| 학습 (.pt 목록 표시 후 입력) | `python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2 --output v2.pt` |
-| 모델 지정 학습 | `python3 scripts/train.py --model yolo26n.pt --epochs 100 --name knob_sign_v2 --output v2.pt` |
+| 학습 (.pt 목록 표시 후 입력) | `python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --output v2.pt` |
+| 모델 지정 학습 | `python3 scripts/train.py --model yolo26n.pt --epochs 100 --output v2.pt` |
 | 기존 학습 가중치 별도 보관 | `python3 scripts/collect_weights.py --output v2.pt` |
 | 검증 | `yolo detect val model=weights/v1.pt data=data.yaml` |
 | 검증 영상 추론 결과 생성 | `yolo detect predict model=weights/v1.pt source=val_video project="$(pwd)/runs/detect" name=val_video_v1` |
@@ -288,6 +288,9 @@ raw 정리 없이 이미 정리된 원본을 빈 출력 위치로 분할하는 �
 
 ```bash
 python3 scripts/split_dataset.py --src dataset/raw --dst dataset_resplit --val-every 9
+
+# 기존 분할은 유지하고 새 파일만 추가 (다른 split에 있는 쌍도 건너뜀)
+python3 scripts/split_dataset.py --src dataset/raw --dst dataset --val-every 9 --skip-existing
 ```
 
 출력 예: `dataset/images/val/sign_yellow/clip_f000120.jpg`와 `dataset/labels/val/sign_yellow/clip_f000120.txt`.
@@ -306,7 +309,7 @@ python3 scripts/split_dataset.py --src dataset/raw --dst dataset_resplit --val-e
 
 ```bash
 source .venv/bin/activate
-python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2 --output v2.pt
+python3 scripts/train.py --epochs 100 --imgsz 640 --batch 16 --output v2.pt
 ```
 
 실행하면 프로젝트 안의 `.pt` 파일 경로 목록을 먼저 표시하고, **학습 시작 가중치**의 파일명 또는 경로를 입력받습니다.
@@ -316,16 +319,16 @@ Enter만 누르면 `yolo26n.pt`를 사용합니다. 파일명이 중복되는 `b
 입력 절차 없이 모델을 지정하려면:
 
 ```bash
-python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 --name knob_sign_v2 --output v2.pt
+python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 --output v2.pt
 
 # 기존 학습 가중치를 시작점으로 새로 fine-tuning하는 예시
-# python3 scripts/train.py --model weights/v1.pt --epochs 100 --name knob_sign_v3 --output v3.pt
+# python3 scripts/train.py --model weights/v1.pt --epochs 100 --output v3.pt
 ```
 
-- `--model`은 시작 가중치이고, `--name`은 학습 결과 폴더 이름입니다. 기존 `.pt`를 선택해도 중단된 학습을 resume하는 방식은 아닙니다.
+- `--model`은 시작 가중치입니다. 학습 폴더 이름은 `--output`에서 `.pt`를 뺀 이름으로 자동 설정됩니다. 기존 `.pt`를 선택해도 중단된 학습을 resume하는 방식은 아닙니다.
 - `--data` 기본값은 프로젝트의 `data.yaml`입니다. 실제 라벨 번호와 `names` 정의를 일치시키세요.
 - GPU 지정은 `--device 0`, CPU 지정은 `--device cpu`를 추가합니다.
-- 위 예시 결과는 `runs/detect/knob_sign_v2/`에 저장됩니다. 같은 이름이 있으면 새 이름이 자동 부여될 수 있으므로 터미널에 표시된 실제 저장 경로를 확인하세요.
+- 위 예시 결과는 `runs/detect/v2/`에 저장됩니다. 결과 폴더 또는 출력 `.pt`가 이미 있으면 학습 전에 덮어쓸지 묻습니다. `y`/`yes`만 진행하며 Enter, `n`, 입력 불가 시 취소합니다. 승인 시 기존 학습 폴더는 `runs/detect/.overwrite_backups/`에 백업하고 같은 이름의 폴더를 새로 사용합니다.
 - 최종 추론에 사용할 가중치는 결과 폴더의 `weights/best.pt`입니다. 입력한 `.pt`의 이름이 결과 파일명으로 사용되지는 않습니다.
 - 배포 장치에는 학습 데이터를 복사할 필요가 없습니다. Python 추론에는 학습된 `.pt`를 사용하고, 아래 NCNN 배포 절차를 사용할 때는 변환된 모델 폴더를 가져갑니다.
 
@@ -335,8 +338,8 @@ python3 scripts/train.py --model yolo26n.pt --epochs 100 --imgsz 640 --batch 16 
 
 `train.py` 학습 완료 시 해당 실행의 `best.pt`를 `weights/<지정한 파일명>`으로 복사합니다.
 `--output v2.pt`로 지정하면 `weights/v2.pt`에 저장합니다. 옵션을 생략하면 학습 시작 전에 저장할 `.pt` 파일명을 입력받습니다.
-파일명만 입력하세요(경로 제외). 같은 이름의 보관 파일이 있으면 갱신하므로 새 버전은 새 이름으로 지정하세요.
-`--name`은 학습 결과 폴더 이름이며, `--output`은 별도 보관할 파일명입니다.
+파일명만 입력하세요(경로 제외). `train.py`는 기존 보관 파일도 학습 전 덮어쓰기 확인에 포함합니다. 보관 파일은 학습 성공 후 갱신합니다.
+예: `--output v3.pt` → `runs/detect/v3/` 및 `weights/v3.pt`. `--name`은 생략하세요. 지정한다면 출력 파일의 확장자를 뺀 이름과 같아야 합니다.
 `best.pt`는 검증 평가가 가장 좋았던 체크포인트이고, `last.pt`는 마지막 체크포인트입니다.
 별도 보관본에는 best/last를 나누지 않고 추론용 best만 사용합니다. `runs/detect`의 학습 기록과 원본 체크포인트는 유지합니다.
 
@@ -385,6 +388,14 @@ yolo detect predict model=weights/v1.pt source=dataset/images/val
 v2 학습 설정은 `degrees: 0`입니다. 회전 증강 및 재학습은 아직 적용하지 않았으며,
 적용 후에는 학습에 쓰지 않은 세로 방향 영상에서 다시 평가해야 합니다.
 
+### v3 소등 오검출 원인 및 검증 (2026-09-30)
+
+v3의 우선 개선 원인은 **초록색 렌즈가 위로 향한 세로 방향 `sign_off` 학습 데이터 부족**으로 잡습니다. 같은 영상의 1027프레임에서 원본은 `sign_yellow 0.889`, 90도 회전은 `sign_off 0.906`, 신호등만 자른 입력은 `sign_off 0.831`이었습니다. 방향뿐 아니라 물체 크기·배경에도 민감하므로 단일 원인으로 확정하지 않고, 실제 세로 방향 소등 데이터를 다양한 거리·조명·배경에서 보강합니다.
+
+전체 1,153프레임에서 `conf=0.25` 기준 `sign_yellow`는 235프레임(실제 점등 포함), `sign_off`는 4프레임입니다. 마지막 소등 구간(33.50~35.87초)의 노란불 오검출은 43프레임입니다. 추론 영상, 원본과 비교한 AVI 및 프레임별 CSV/분석 JSON은 `runs/detect/val_video_v3/`에 저장했습니다.
+
+상세 근거와 후속 작업은 [미점등 신호등 오탐 기록](TODO_traffic_light_false_positives.md#v3-원인-분석-및-개선-기준-2026-09-30)을 참고하세요.
+
 <a id="quick-compare"></a>
 
 ### 검증 영상: 원본과 추론 결과 동시 재생
@@ -395,10 +406,14 @@ python3 scripts/predict_video.py
 
 # 특정 결과 폴더 또는 영상만 처리
 python3 scripts/predict_video.py --prediction runs/detect/val_video_v1
+
+# v3 비교 영상은 AVI로 저장
+python3 scripts/predict_video.py --prediction runs/detect/val_video_v3 --format avi
 ```
 
 재추론 없이 기존 영상 두 개를 합칩니다. `val_video`에서 확장자를 제외한 파일명이 같은 원본을 찾아,
 왼쪽에 원본·오른쪽에 추론 결과를 배치한 `<영상이름>_comparison.mp4`를 추론 결과와 같은 폴더에 저장합니다.
+`--format avi` 또는 `--format webm`으로 출력 형식을 선택할 수 있습니다.
 따라서 기존 `val_video_<pt이름>` 결과 폴더 이름이 유지됩니다. `.pt` 파일이나 GPU는 필요하지 않습니다.
 원본과 추론 영상은 첫 프레임부터 대응하는 전체 영상이어야 하며 FPS·프레임 수·해상도가 다르면 중단합니다.
 원본 FPS를 유지하고 음성은 포함하지 않습니다.

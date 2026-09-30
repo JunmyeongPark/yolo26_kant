@@ -1,0 +1,44 @@
+[
+  {
+    "padding_pixels": 0,
+    "crop_shape": [
+      229,
+      135,
+      3
+    ],
+    "detections": [
+      {
+        "class": "sign_off",
+        "confidence": 0.8309991359710693
+      }
+    ]
+  },
+  {
+    "padding_pixels": 15,
+    "crop_shape": [
+      259,
+      165,
+      3
+    ],
+    "detections": [
+      {
+        "class": "sign_off",
+        "confidence": 0.8308466076850891
+      }
+    ]
+  },
+  {
+    "padding_pixels": 30,
+    "crop_shape": [
+      289,
+      195,
+      3
+    ],
+    "detections": [
+      {
+        "class": "sign_off",
+        "confidence": 0.837803304195404
+      }
+    ]
+  }
+]
